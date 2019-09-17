@@ -126,12 +126,24 @@ class Hero {
         this._generate_skills(data);
     }
 
+    wakeUpFromSleep() {
+        this.status.sleep = 0;
+    }
+
     isReady() {
         return this.isAlive() &&
             this.action_power <= 0 &&
             this.status.stun === 0 &&
             this.status.sleep === 0 &&
             this.status.freeze === 0;
+    }
+
+    isTargetableByAlly() {
+        return this.isAlive() && this.status.freeze === 0;
+    }
+
+    isTargetableByEnemy() {
+        return this.isAlive() && this.status.freeze === 0 && this.status.invulnurable === 0;
     }
 
     isReadyForCastingSkill() {
@@ -146,6 +158,14 @@ class Hero {
         if ( this.casting_skill ) {
             this.casting_skill = null;
         }
+    }
+
+    removeEffectByType(effect_type) {
+        this.effects.forEach(effect => {
+            if (effect.type === effect_type) {
+                effect.remove();
+            }
+        });
     }
 
     tick(elapsed){
@@ -198,5 +218,18 @@ class Trigger {
         this.owner = owner;
         this.action = cb;
         this.duration = duration || 1000;
+        this._period = 0;
+        this._period_counter = 0;
+        this._avalible = 9999;
     }
+
+    period(value) {
+        this._period = value;
+        this._period_counter = 0;
+    }
+
+    useCount(value) {
+        this._avalible = value;
+    }
+
 }

@@ -59,7 +59,15 @@ const EffectType = {
     'Invulnerable': 45,
     'Taunt': 46,
     'Mark': 47,
-    'Bleeding': 60
+    'Shield': 48,
+    'Bleeding': 60,
+    'Delayed': 61,
+    'FlatATK': 70,
+    'FlatHP': 71,
+    'FlatArmor': 72,
+    'PercentATK': 73,
+    'PercentHP': 74,
+    'PercentArmor': 75,
 };
 Object.freeze(EffectType);
 
@@ -94,3 +102,12 @@ const DamageType = {
 };
 Object.freeze(DamageType);
 
+
+// Item types
+const ItemType = {
+    'Weapon': 1,
+    'Armor': 2,
+    'Accessory': 4,
+    'Gem': 8
+};
+Object.freeze(ItemType);

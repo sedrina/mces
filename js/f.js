@@ -30,6 +30,10 @@ class F {
         this.target = target;
     }
 
+    dealFlatDamage(value){
+        return this._apply_damage(value, 0);
+    }
+
     dealDamage(percent){
         let value = this._get_normal_attack_value() * percent;
         return this._apply_damage(value, 0);
@@ -79,8 +83,11 @@ class F {
         if ( value === -2 ) {
             return 0;
         }
-        this._make_lifesteal(value, lifesteal_bonus);
-        this._deal_damage(value);
+        value = this._damage_to_shields(value);
+        if ( value > 0 ) {
+            this._make_lifesteal(value, lifesteal_bonus);
+            this._deal_damage(value);
+        }
         this._apply_counter_damages(value);
         return value;
     }
@@ -119,6 +126,24 @@ class F {
     removeDebuffs(count) {
         let buffs = this.target.effects.filter( e => e.isRemoveableDebuff);
         return this._remove_effects_from_target(buffs, count);
+    }
+
+    _damage_to_shields(value) {
+        for ( let i in this.target.effects ) {
+            let effect = this.target.effects[i];
+            if ( effect.type !== EffectType.Shield ) {
+                continue;
+            }
+            if ( value >= effect.value ) {
+                value -= effect.value;
+                effect.remove();
+            }
+            else {
+                effect.value -= value;
+                return 0;
+            }
+        }
+        return value;
     }
 
     _remove_effects_from_target(effect_list, count) {
@@ -209,6 +234,7 @@ class F {
             throw 'Died'
         }
         else {
+            this.target.wakeUpFromSleep();
             this.run_trigger(When.OnAttacked, this.caster, this.target);
             this.run_trigger(When.OnStruck, this.target, this.caster);
         }
@@ -233,6 +259,10 @@ class F {
 
     heal(percent) {
         return this._heal(this.caster.primary_stats.atk * percent );
+    }
+
+    healByMaxHp(percent) {
+        return this._heal(this.caster.primary_stats.max_hp * percent );
     }
 
     _heal(value) {
@@ -411,6 +441,89 @@ class F {
     addTrigger(when, cb, duration) {
         let t = new Trigger(when, this.caster, cb, duration);
         this.arena.__add_trigger(t);
+        return t;
+    }
+
+    reviveByMaxHp(value) {
+        this.target.current_hp = Math.floor(value * this.target.primary_stats.max_hp);
+        this.run_trigger(When.Revived, this.target, this.caster);
+    }
+
+    reviveByFlatHp(value) {
+        this.target.current_hp = value;
+        this.run_trigger(When.Revived, this.target, this.caster);
+    }
+
+    forAllEnemies(cb) {
+        let enemies = this.arena._get_multi_targetable_enemies(this.caster);
+        enemies.forEach(e => {
+            try {
+                let tmp = new F(this.arena, this.caster, e);
+                cb(tmp);
+            }
+            catch {
+
+            }
+        });
+    }
+
+    forAllAllies(cb) {
+        let allies = this.arena._get_targetable_allies(this.caster);
+        allies.forEach(e => {
+            try {
+                let tmp = new F(this.arena, this.caster, e);
+                cb(tmp);
+            }
+            catch {
+
+            }
+        });
+    }
+
+    delayed(delay_time, cb) {
+        let tmp = new DelayedEffect(this.triggerCtx, delay_time, cb);
+        this.target.effects.push(tmp);
+        return tmp;
+    }
+
+    healOverTimeByMaxHp(value, duration){
+
+    }
+
+    shieldByCasterMaxHp(percent, duration) {
+        return this._make_shield(this.caster.primary_stats.max_hp * percent , duration);
+    }
+
+    shieldByTargetMaxHp(percent, duration) {
+        console.log('ADD SHIEDL..', percent);
+        return this._make_shield(this.target.primary_stats.max_hp * percent , duration);
+    }
+
+    shieldByCasterCurrentHp(percent, duration) {
+        return this._make_shield(this.caster.current_hp * percent , duration);
+    }
+
+    shieldByTargetCurrentHp(percent, duration) {
+        return this._make_shield(this.target.current_hp * percent , duration);
+    }
+
+    _make_shield(value, duration) {
+        return this._add_effect(EffectType.Shield, Math.floor(value), duration);
+    }
+
+    getTotalShield() {
+        let sum = 0;
+        this.target.effects.forEach(effect => {
+            if (effect.type === EffectType.Shield) {
+                console.log('shiled count...', effect.value);
+                sum += effect.value;
+            }
+        });
+        return sum;
+    }
+
+    removeMark() {
+        this.target.removeEffectByType(EffectType.Mark);
     }
 
     _add_effect(type, value, duration) {

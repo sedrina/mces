@@ -114,13 +114,17 @@ class Effect {
             case EffectType.MaxHp:
             case EffectType.ModifyAttackSpeed:
             case EffectType.ModifySkillSpeed:
-                console.log('Not impleteneted yet!!!!');
+                break;
+            case EffectType.Shield:
+                // No needs for action
                 break;
         }
     }
 
     remove() {
         this.add(-this.value);
+        this.type = EffectType.Dummy;
+        this.duration = -1;
     }
 
     update(delta) {
@@ -185,3 +189,31 @@ class BleedingEffect extends Effect
     }
 }
 
+
+class DelayedEffect extends Effect {
+    constructor(fctx, delay_time, cb)
+    {
+        super(fctx.caster, fctx.target, EffectType.Delayed, 0, delay_time);
+        this.cb_function = cb;
+        this.ctx = fctx;
+    }
+
+    update(delta) {
+        if ( this.duration > 0 ) {
+            this.duration -= delta;
+            if ( this.duration <= 0 ) {
+                try {
+                    this.cb_function(this.ctx);
+                }
+                catch {
+
+                }
+            }
+        }
+    }
+
+    _apply_damage() {
+        // TODO what is the apply mechanism???
+    }
+
+}

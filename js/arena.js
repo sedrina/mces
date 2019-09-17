@@ -68,6 +68,7 @@ class Arena {
         this.heroes.forEach(h => h.tick(delta));
         this._triggers.forEach(t => {
             t.duration -= delta;
+            t._period_counter -= delta;
         });
         this._triggers = this._triggers.filter(t => t.duration > 0);
         this._game_time += delta;
@@ -89,7 +90,7 @@ class Arena {
         hero.action_power = hero.primary_stats.attack_cd / hero.modifier.attack_cd;
         let skills = hero.get_avaliable_skills();
         if ( skills.length > 0 ) {
-            let skill = skills[Math.floor(Math.random() * skills.length)];
+            let skill = random_from_array(skills);
             this._apply_skill(hero, skill);
             return;
         }
@@ -128,7 +129,7 @@ class Arena {
         }
 
         if ( skill.target_type === TargetType.Self ) {
-            this.__apply_skill_to_target(hero, target, skill);
+            this.__apply_skill_to_target(hero, hero, skill);
             return;
         }
 
@@ -160,12 +161,7 @@ class Arena {
     }
 
     _get_single_targetable_enemies(hero) {
-        const enemies = this.heroes.filter(h =>
-            h.team_id !== hero.team_id &&
-            h.isAlive() &&
-            h.status.freeze === 0 &&
-            h.status.invulnurable === 0
-        );
+        const enemies = this.heroes.filter(h => h.team_id !== hero.team_id && hero.isTargetableByEnemy());
         let taunted = enemies.filter(h => h.status.taunt);
         if ( taunted.length === 0 ) {
             return enemies;
@@ -179,20 +175,11 @@ class Arena {
     }
 
     _get_multi_targetable_enemies(hero) {
-        return this.heroes.filter(h =>
-            h.team_id !== hero.team_id &&
-            h.isAlive() &&
-            h.status.freeze === 0 &&
-            h.status.invulnurable === 0
-        );
+        return this.heroes.filter(h => h.team_id !== hero.team_id && hero.isTargetableByEnemy());
     }
 
     _get_targetable_allies() {
-        return this.heroes.filter(h =>
-            h.team_id === hero.team_id &&
-            h.isAlive() &&
-            h.status.freeze === 0
-        );
+        return this.heroes.filter(h => h.team_id === hero.team_id && hero.isTargetableByAlly());
     }
 
     _is_finished() {
@@ -215,7 +202,12 @@ class Arena {
 
     __run_trigger(when, caster, trigger_hero) {
         this._triggers.forEach(t => {
-            if ( t.type === when && t.owner === caster ) {
+            if ( t.type === when && t.owner === caster &&
+                t._avalible > 0 && t._period_counter <= 0 ) {
+                t._avalible--;
+                if ( t._period > 0 ) {
+                    t._period_counter = t._period;
+                }
                 let f = new F(this, caster, trigger_hero);
                 try {
                     t.action(f);
