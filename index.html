@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MonsterCry Eternal Simulator</title>
+</head>
+<script src="js/defines.js"></script>
+<script src="js/auxilia.js"></script>
+<script src="js/data.js"></script>
+<script src="js/f.js"></script>
+<script src="js/effect.js"></script>
+<script src="js/elements.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/simulator.js"></script>
+<body onload="prepare_ui()">
+</body>
+
+<div id="div_team_1"></div>
+<br></br>
+<div id="div_team_2"></div>
+<br></br>
+Simulation Count: <input id='simulation_count' type="number" pattern='[0-9]{10}' value="100"/>
+<br></br>
+Turn Max Time: <input id='simulation_time' type="number" pattern='[0-9]{10}' value="100"/>seconds
+<br></br>
+<button id='btn_start_sim' onclick="start_simulation()">Start</button>
+<br></br>
+<label id="lb_result"></label>
+
+<script>
+    const HERO_COUNT = 1;
+    function prepare_ui() {
+        let avaliable_heroes = [];
+        for ( let h in HEROES ) {
+            avaliable_heroes.push(h);
+        }
+
+        let team1 = document.getElementById('div_team_1');
+        let team2 = document.getElementById('div_team_2');
+        for ( let i = 0 ; i < HERO_COUNT ; i++ ) {
+            create_selector(team1, i , HEROES);
+            create_selector(team2, i , HEROES);
+        }
+    }
+    
+    function create_selector(div, i, heroes) {
+        let sel = document.createElement("SELECT");
+        sel.id = div.id + '_' + i;
+        for ( let name  in heroes ) {
+            let option = document.createElement("OPTION");
+            option.text = name;
+            sel.add(option);
+        }
+        div.appendChild(sel);
+    }
+    
+    function start_simulation() {
+        let team1 = get_selected_heroes('div_team_1');
+        let team2 = get_selected_heroes('div_team_2');
+        let count = document.getElementById('simulation_count').value;
+        let time_limit = document.getElementById('simulation_time').value;
+        let simulator = new Simulator(team1, team2, count, time_limit);
+        document.getElementById('btn_start_sim').disabled = true;
+        let result = simulator.start();
+        document.getElementById('lb_result').innerHTML = result;
+        document.getElementById('btn_start_sim').disabled = false;
+    }
+
+
+    function get_selected_heroes(tag) {
+        let selected = [];
+        for ( let i = 0 ; i < HERO_COUNT ; i++ ) {
+            let e = document.getElementById(tag + '_' + i);
+            selected.push(e.options[e.selectedIndex].value);
+        }
+        return selected;
+    }
+
+
+</script>
+
+</html>
