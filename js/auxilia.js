@@ -13,3 +13,7 @@ function std_max(val0, val1) {
 function std_min(val0, val1) {
     return val0 < val1 ? val0 : val1;
 }
+
+function notImplemented() {
+    throw 'Not Implemented';
+}

@@ -28,10 +28,8 @@ class Simulator {
     }
 
     _simulate_arena() {
-        let t0 = shuffle(this._create_team(1, this.team1));
-        let t1 = shuffle(this._create_team(2, this.team2));
-        let order = Math.random() > 0.5;
-        let heroes = order ? t0.concat(t1) : t1.concat(t0);
+        let heroes = this._create_team(1, this.team1).concat(this._create_team(2, this.team2));
+        heroes = shuffle(heroes);
         let arena = new Arena(heroes, this.time_limit);
         let result = arena.run();
         this.results.push(result);

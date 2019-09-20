@@ -30,6 +30,7 @@ class F {
         this.target = target;
     }
 
+    // Damage dealing
     dealFlatDamage(value){
         return this._apply_damage(value, 0);
     }
@@ -65,6 +66,393 @@ class F {
         return this._apply_damage(value, 0);
     }
 
+    dealBleedDamage(percent, duration){
+        if ( is_success(this.target.modifier.immunity_to_bleed) ) {
+            return;
+        }
+        // TODO what is the bleeding damage modify, dodge, critic mechanism ??
+        let value = this._get_normal_attack_value() * percent;
+        this._apply_bleed_damage(DamageType.Normal, value, duration);
+    }
+
+    dealBleedPierceDamage(caster, target, percent, duration){
+        if ( is_success(this.target.modifier.immunity_to_bleed) ) {
+            return;
+        }
+        // TODO what is the bleeding damage modify, dodge, critic mechanism ??
+        let value = this.caster.primary_stats.atk * percent;
+        this._apply_bleed_damage(DamageType.Piercing, value, duration);
+    }
+
+    // Healing
+    healFlat(value) {
+        return this._heal(value);
+    }
+
+    heal(percent) {
+        return this._heal(this.caster.primary_stats.atk * percent );
+    }
+
+    healByMaxHp(percent) {
+        return this._heal(this.caster.primary_stats.max_hp * percent );
+    }
+
+    healOverTime(percent, duration, tick_time) {
+        notImplemented();
+        return this._heal(this.caster.primary_stats.max_hp * percent );
+    }
+
+    // Coword Control
+    silence(duration) {
+        if ( is_success(this.target.modifier.immunity_to_silence) ) {
+            return;
+        }
+        return this._add_effect(EffectType.Silence, 1, duration);
+    }
+
+    stun(duration) {
+        if ( is_success(this.target.modifier.immunity_to_stun) ) {
+            return;
+        }
+        console.log('minuel hit stun');
+        return this._add_effect(EffectType.Stun, 1, duration);
+    }
+
+    freeze(duration) {
+        if ( is_success(this.target.modifier.immunity_to_freeze) ) {
+            return;
+        }
+        return this._add_effect(EffectType.Freeze, 1, duration);
+    }
+
+    sleep(duration) {
+        if ( is_success(this.target.modifier.immunity_to_sleep) ) {
+            return;
+        }
+        return this._add_effect(EffectType.Sleep, 1, duration);
+    }
+
+    invulnurable(duration) {
+        return this._add_effect(EffectType.Invulnerable, 1, duration);
+    }
+
+    exhaust(duration) {
+        if ( is_success(this.target.modifier.immunity_to_exhaust) ) {
+            return;
+        }
+        return this._add_effect(EffectType.Exhaust, 1, duration);
+    }
+
+    taunt(duration) {
+        return this._add_effect(EffectType.Taunt, 1, duration);
+    }
+
+    mark(duration) {
+        return this._add_effect(EffectType.Mark, 1, duration);
+    }
+
+    removeMark() {
+        this.target.removeEffectByType(EffectType.Mark);
+    }
+
+    // Crest Management
+    addCrestOfDestruction(count) {
+        if ( is_success(this.target.modifier.immunity_to_crest_of_desturction) ) {
+            return;
+        }
+        this.target.crest.destruction = std_max(5, this.target.crest.destruction + count);
+    }
+
+    addCrestOfDespair(count) {
+        if ( is_success(this.target.modifier.immunity_to_crest_of_despair) ) {
+            return;
+        }
+        this.target.crest.despair = std_max(5, this.target.crest.despair + count);
+    }
+
+    addCrestOfChaos(count) {
+        if ( is_success(this.target.modifier.immunity_to_crest_of_chaos) ) {
+            return;
+        }
+        this.target.crest.chaos = std_max(5, this.target.crest.chaos + count);
+    }
+
+    withCrestOfDestruction(cb) {
+        let tmp = this.target.crest.destruction;
+        if ( tmp > 0 ) {
+            this.target.crest.destruction = 0;
+            cb(tmp);
+        }
+    }
+
+    withCrestOfDespair(cb) {
+        let tmp = this.target.crest.despair;
+        if ( tmp > 0 ) {
+            this.target.crest.despair = 0;
+            cb(tmp);
+        }
+    }
+
+    withCrestOfChaos(cb) {
+        let tmp = this.target.crest.chaos;
+        if ( tmp > 0 ) {
+            this.target.crest.chaos = 0;
+            cb(tmp);
+        }
+    }
+
+    // Triggers
+    addTrigger(when, cb, duration) {
+        let t = new Trigger(when, this.caster, cb, duration);
+        this.arena.__add_trigger(t);
+        return t;
+    }
+
+    // Shields
+    shield(percent, duration) {
+        return this.shieldFlat(this.caster.primary_stats.atk * percent, duration);
+    }
+
+    shieldByMaxHP(percent, duration) {
+        return this.shieldFlat(this.caster.primary_stats.max_hp * percent, duration);
+    }
+
+    shieldByCurrentHP(percent, duration) {
+        return this.shieldFlat(this.caster.current_hp  * percent, duration);
+    }
+
+    shieldFlat(value, duration) {
+        value = Math.floor(value);
+        return this._add_effect(EffectType.Shield, value, duration);
+    }
+
+    getTotalShield() {
+        let sum = 0;
+        this.target.effects.forEach(effect => {
+            if (effect.type === EffectType.Shield) {
+                //console.log('shiled count...', effect.value);
+                sum += effect.value;
+            }
+        });
+        return sum;
+    }
+
+    destroyShields() {
+        return 0;
+    }
+
+    // Effect Management
+    removeBuffs(count) {
+        let buffs = this.target.effects.filter( e => e.isRemoveableBuff);
+        return this._remove_effects_from_target(buffs, count);
+    }
+
+    removeDebuffs(count) {
+        let buffs = this.target.effects.filter( e => e.isRemoveableDebuff);
+        return this._remove_effects_from_target(buffs, count);
+    }
+
+    removeEffect(effect) {
+        effect.remove();
+    }
+
+    // Revive
+    revive(percent) {
+        this.reviveWithFlatHp(this.caster.primary_stats.atk * percent);
+    }
+
+    reviveWithFlatHp(value) {
+        this.target.current_hp = Math.floor(value);
+        this._run_trigger(When.Revived, this.target, this.caster);
+    }
+
+    // Action Power Modification
+    setActionPower(value) {
+        this.target.action_power = this.target.primary_stats.attack_cd - value;
+    }
+
+    increaseActionPower(value) {
+        this.target.action_power += (value * 0.01);
+    }
+
+    increaseAttackSpeed(percent, duration) {
+        if ( percent < 0 ) {
+            throw 'negative increaseAttackSpeed is not allowed use decreaseAttackSpeed';
+        }
+        return this._add_effect(EffectType.PercentAttackSpeed, percent, duration);
+    }
+
+    decreaseAttackSpeed(percent, duration) {
+        if ( percent < 0 ) {
+            throw 'negative decreaseAttackSpeed is not allowed use increaseAttackSpeed';
+        }
+        return this._add_effect(EffectType.PercentAttackSpeed, -percent, duration);
+    }
+
+    // Healt Limit modifier
+    gainMaxHPFlat(value) {
+        return this._add_effect(EffectType.FlatHP, value);
+    }
+
+    // Healt Limit modifier
+    gainMaxHPPercent(percent) {
+        return this._add_effect(EffectType.PercentHP, percent);
+    }
+
+    // Get Status...
+    get casterATK() {
+        return this.caster.primary_stats.atk;
+    }
+
+    get casterArmor() {
+        return this.caster.primary_stats.armor;
+    }
+
+    get casterMaxHP() {
+        return this.caster.primary_stats.max_hp;
+    }
+
+    get casterCurrentHP() {
+        return this.caster.current_hp;
+    }
+
+    get targetATK() {
+        return this.target.primary_stats.atk;
+    }
+
+    get targetArmor() {
+        return this.target.primary_stats.armor;
+    }
+
+    get targetMaxHP() {
+        return this.target.primary_stats.max_hp;
+    }
+
+    get targetCurrentHP() {
+        return this.target.current_hp;
+    }
+
+    // modifiers
+    dodgeChance(percent, duration) {
+        return this._add_effect(EffectType.Dodge, percent, duration);
+    }
+
+    hitChance(percent, duration) {
+        return this._add_effect(EffectType.HitChance, percent, duration);
+    }
+
+    counterAttackChance(percent, duration) {
+        return this._add_effect(EffectType.CounterAttack, percent, duration);
+
+    }
+    blockChance(percent, duration) {
+        return this._add_effect(EffectType.Block, percent, duration);
+    }
+
+    critiacalStrikeChance(percent, duration) {
+        return this._add_effect(EffectType.CriticalHit, percent, duration);
+    }
+
+    damageReduction(percent, duration) {
+        return this._add_effect(EffectType.DamageReduction, percent, duration);
+    }
+
+    damageDealt(percent, duration) {
+        return this._add_effect(EffectType.DamageDealt, percent, duration);
+    }
+
+    lifesteal(percent, duration) {
+        return this._add_effect(EffectType.Lifesteal, percent, duration);
+    }
+
+    reflection(percent, duration) {
+        return this._add_effect(EffectType.ReflectiveDamage, percent, duration);
+    }
+
+    healingDone(percent, duration){
+        this._add_effect(EffectType.HealingDone, percent, duration);
+    }
+
+    recovery(percent, duration) {
+        this._add_effect(EffectType.Recovery, percent, duration);
+    }
+
+    maxsimize(percent, duration) {
+        return this._add_effect(EffectType.Maximize, percent, duration);
+    }
+
+    elasticty(percent, duration) {
+        return this._add_effect(EffectType.Elasticty, percent, duration);
+    }
+
+
+    forAllEnemies(cb) {
+        let enemies = this.arena._get_multi_targetable_enemies(this.caster);
+        this._call_with_new_context(enemies);
+    }
+
+    forAllLiveAllies(cb) {
+        let allies = this.arena._get_targetable_allies(this.caster);
+        this._call_with_new_context(allies);
+    }
+
+    forAllDeadllies(cb) {
+        let allies = this.arena._get_dead_allies(this.caster);
+        this._call_with_new_context(allies);
+    }
+
+
+
+    delayed(delay_time, cb) {
+        let tmp = new DelayedEffect(this.triggerCtx, delay_time, cb);
+        this.target.effects.push(tmp);
+        return tmp;
+    }
+
+    _add_effect(type, value, duration) {
+        let e = new Effect(this.caster, this.target, type, value, duration);
+        e.add(value);
+        this.target.effects.push(e);
+        return e;
+    }
+
+    get ownerCtx() {
+        return new F(this.arena, this.caster, this.caster);
+    }
+
+    get triggerCtx() {
+        return new F(this.arena, this.caster, this.target);
+    }
+
+    get ctxCasterCaster() {
+        return new F(this.arena, this.caster, this.caster);
+    }
+
+    get ctxCasterTarget() {
+        return new F(this.arena, this.caster, this.target);
+    }
+
+    get targetIsStunned() {
+        return this.target.status.stun > 0;
+    }
+
+    get targetIsMarked() {
+        return this.target.status.mark > 0;
+    }
+
+    get targetIsTaunted() {
+        return this.target.status.taunt > 0;
+    }
+
+    get targetIsBleeding() {
+        return this.target.effects.filter(e => e.type === EffectType.Bleeding).length > 0;
+    }
+
+    get targetHpRatio() {
+        return this.target.current_hp / this.target.primary_stats.max_hp;
+    }
+
+    // Privates...
     _get_normal_attack_value() {
         return (this.caster.primary_stats.atk * this.caster.primary_stats.atk ) /
             (this.caster.primary_stats.atk + this.target.primary_stats.armor);
@@ -85,29 +473,11 @@ class F {
         }
         value = this._damage_to_shields(value);
         if ( value > 0 ) {
-            this._make_lifesteal(value, lifesteal_bonus);
             this._deal_damage(value);
+            this._make_lifesteal(value, lifesteal_bonus);
         }
         this._apply_counter_damages(value);
         return value;
-    }
-
-    dealBleedDamage(percent, duration){
-        if ( is_success(this.target.modifier.immunity_to_bleed) ) {
-            return;
-        }
-        // TODO what is the bleeding damage modify, dodge, critic mechanism ??
-        let value = this._get_normal_attack_value() * percent;
-        this._apply_bleed_damage(DamageType.Normal, value, duration);
-    }
-
-    dealBleedPierceDamage(caster, target, percent, duration){
-        if ( is_success(this.target.modifier.immunity_to_bleed) ) {
-            return;
-        }
-        // TODO what is the bleeding damage modify, dodge, critic mechanism ??
-        let value = this.caster.primary_stats.atk * percent;
-        this._apply_bleed_damage(DamageType.Piercing, value, duration);
     }
 
     _apply_bleed_damage(damage_type, total_damage, duration) {
@@ -116,16 +486,6 @@ class F {
         let e = new BleedingEffect(f, value, DamageType.Normal, duration);
         e._apply_damage();
         this.target.effects.push(e);
-    }
-
-    removeBuffs(count) {
-        let buffs = this.target.effects.filter( e => e.isRemoveableBuff);
-        return this._remove_effects_from_target(buffs, count);
-    }
-
-    removeDebuffs(count) {
-        let buffs = this.target.effects.filter( e => e.isRemoveableDebuff);
-        return this._remove_effects_from_target(buffs, count);
     }
 
     _damage_to_shields(value) {
@@ -181,13 +541,13 @@ class F {
         let hit = std_max(this.caster.modifier.hit_chance, 0);
 
         if ( is_missed(dodge, hit) ) {
-            this.run_trigger(When.Dodged, this.target, this.caster);
+            this._run_trigger(When.Dodged, this.target, this.caster);
             return -2;
         }
 
         if ( is_success(this.caster.modifier.critcal) ) {
-            this.run_trigger(When.CriticalHitDealt, this.caster, this.target);
-            this.run_trigger(When.CriticalHitTaken, this.target, this.caster);
+            this._run_trigger(When.CriticalHitDealt, this.caster, this.target);
+            this._run_trigger(When.CriticalHitTaken, this.target, this.caster);
             var maximize = std_max(this.caster.modifier.maxismize, 0);
             var elasticty = std_max(this.target.modifier.elasticty, 0);
             value *= (1.5 + maximize);
@@ -205,7 +565,7 @@ class F {
         }
 
         if ( is_success(this.target.modifier.block) ) {
-            this.run_trigger(When.Blocked, this.target, this.caster);
+            this._run_trigger(When.Blocked, this.target, this.caster);
             value /= 2;
         }
 
@@ -228,15 +588,15 @@ class F {
     _deal_damage(value) {
         this.target.current_hp -= value;
         if ( this.target.current_hp <= 0 ) {
-            this.run_trigger(When.OnAttacked, this.caster, this.target);
-            this.run_trigger(When.Killed, this.caster, this.target);
-            this.run_trigger(When.Died, this.target, this.caster);
+            this._run_trigger(When.OnAttacked, this.caster, this.target);
+            this._run_trigger(When.Killed, this.caster, this.target);
+            this._run_trigger(When.Died, this.target, this.caster);
             throw 'Died'
         }
         else {
             this.target.wakeUpFromSleep();
-            this.run_trigger(When.OnAttacked, this.caster, this.target);
-            this.run_trigger(When.OnStruck, this.target, this.caster);
+            this._run_trigger(When.OnAttacked, this.caster, this.target);
+            this._run_trigger(When.OnStruck, this.target, this.caster);
         }
     }
 
@@ -249,20 +609,12 @@ class F {
         if ( is_success(this.target.modifier.counter_attack) ) {
             let fx = F(this.target, this.caster);
             fx.dealDamage(1);
-            this.run_trigger(When.CounterAttacked, this.target, this.caster);
+            this._run_trigger(When.CounterAttacked, this.target, this.caster);
         }
     }
 
     _deal_reflective_damage(value) {
 
-    }
-
-    heal(percent) {
-        return this._heal(this.caster.primary_stats.atk * percent );
-    }
-
-    healByMaxHp(percent) {
-        return this._heal(this.caster.primary_stats.max_hp * percent );
     }
 
     _heal(value) {
@@ -276,303 +628,21 @@ class F {
         this.caster.current_hp += heal_count;
     }
 
-    silence(duration) {
-        if ( is_success(this.target.modifier.immunity_to_silence) ) {
-            return;
-        }
-        return this._add_effect(EffectType.Silence, 0, duration);
-    }
-
-    stun(duration) {
-        if ( is_success(this.target.modifier.immunity_to_stun) ) {
-            return;
-        }
-        return this._add_effect(EffectType.Stun, 0, duration);
-    }
-
-    freeze(duration) {
-        if ( is_success(this.target.modifier.immunity_to_freeze) ) {
-            return;
-        }
-        return this._add_effect(EffectType.Freeze, 0, duration);
-    }
-
-    invulnurable(duration) {
-        return this._add_effect(EffectType.Invulnerable, 0, duration);
-    }
-
-    sleep(duration) {
-        if ( is_success(this.target.modifier.immunity_to_sleep) ) {
-            return;
-        }
-        return this._add_effect(EffectType.Sleep, 0, duration);
-    }
-
-    addCrestOfDestruction(count) {
-        if ( is_success(this.target.modifier.immunity_to_crest_of_desturction) ) {
-            return;
-        }
-        this.target.crest.destruction = std_max(5, this.target.crest.destruction + count);
-    }
-
-    addCrestOfDespair(count) {
-        if ( is_success(this.target.modifier.immunity_to_crest_of_despair) ) {
-            return;
-        }
-        this.target.crest.despair = std_max(5, this.target.crest.destruction + count);
-    }
-
-    addCrestOfChaos(count) {
-        if ( is_success(this.target.modifier.immunity_to_crest_of_chaos) ) {
-            return;
-        }
-        this.target.crest.chaos = std_max(5, this.target.crest.destruction + count);
-    }
-
-    withCrestOfDestruction(cb) {
-        let tmp = this.target.crest.destruction;
-        if ( tmp > 0 ) {
-            this.target.crest.destruction = 0;
-            cb(tmp);
-        }
-    }
-
-    withCrestOfDespair(cb) {
-        let tmp = this.target.crest.despair;
-        if ( tmp > 0 ) {
-            this.target.crest.despair = 0;
-            cb(tmp);
-        }
-    }
-
-    withCrestOfChaos(cb) {
-        let tmp = this.target.crest.chaos;
-        if ( tmp > 0 ) {
-            this.target.crest.chaos = 0;
-            cb(tmp);
-        }
-    }
-
-    modifyHealingDone(percent, duration){
-        this._add_effect(EffectType.HealingDone, percent, duration);
-    }
-
-    modifyRecovery(percent, duration) {
-        this._add_effect(EffectType.Recovery, percent, duration);
-    }
-
-    exhaust(duration) {
-        if ( is_success(this.target.modifier_stats.immunity_to_exhaust) ) {
-            return;
-        }
-        return this._add_effect(EffectType.Exhaust, 0, duration);
-    }
-
-    modifyAtk(percent, duration) {
-        return this._add_effect(EffectType.ModifyATK, percent, duration);
-    }
-
-    modifyArmor(percent, duration) {
-        return this._add_effect(EffectType.ModifyArmor, percent, duration);
-    }
-
-
-    dodgeChance(percent, duration) {
-        return this._add_effect(EffectType.Dodge, percent, duration);
-    }
-
-    counterAttackChance(percent, duration) {
-        return this._add_effect(EffectType.CounterAttack, percent, duration);
-
-    }
-
-    blockChance(percent, duration) {
-        return this._add_effect(EffectType.Block, percent, duration);
-    }
-
-    setActionPower(value) {
-        this.target.action_power = value;
-    }
-
-    addActionPower(value) {
-        this.target.action_power -= value;
-    }
-
-    critiacalStrikeChance(percent, duration) {
-        return this._add_effect(EffectType.CriticalHit, percent, duration);
-    }
-
-    maxsimize(percent, duration) {
-        return this._add_effect(EffectType.Maximize, percent, duration);
-    }
-
-    elasticty(percent, duration) {
-        return this._add_effect(EffectType.Elasticty, percent, duration);
-    }
-
-    modifyDamageDealt(percent, duration) {
-        return this._add_effect(EffectType.DamageDealt, percent, duration);
-    }
-
-    modifyAttackSpeed(percent, duration) {
-        return this._add_effect(EffectType.ModifyAttackSpeed, percent, duration);
-    }
-
-    modifySkillSpeed(percent, duration) {
-        return this._add_effect(EffectType.ModifySkillSpeed, percent, duration);
-    }
-
-    modifyLifesteal(percent, duration) {
-        return this._add_effect(EffectType.Lifesteal, percent, duration);
-    }
-
-    modifyDamageReduction(percent, duration) {
-        return this._add_effect(EffectType.DamageReduction, percent, duration);
-    }
-
-    taunt(duration) {
-        return this._add_effect(EffectType.Dummy, percent, duration);
-    }
-
-    mark(duration) {
-        return this._add_effect(EffectType.Dummy, percent, duration);
-    }
-
-    addTrigger(when, cb, duration) {
-        let t = new Trigger(when, this.caster, cb, duration);
-        this.arena.__add_trigger(t);
-        return t;
-    }
-
-    reviveByMaxHp(value) {
-        this.target.current_hp = Math.floor(value * this.target.primary_stats.max_hp);
-        this.run_trigger(When.Revived, this.target, this.caster);
-    }
-
-    reviveByFlatHp(value) {
-        this.target.current_hp = value;
-        this.run_trigger(When.Revived, this.target, this.caster);
-    }
-
-    forAllEnemies(cb) {
-        let enemies = this.arena._get_multi_targetable_enemies(this.caster);
-        enemies.forEach(e => {
-            try {
-                let tmp = new F(this.arena, this.caster, e);
-                cb(tmp);
-            }
-            catch {
-
-            }
-        });
-    }
-
-    forAllAllies(cb) {
-        let allies = this.arena._get_targetable_allies(this.caster);
-        allies.forEach(e => {
-            try {
-                let tmp = new F(this.arena, this.caster, e);
-                cb(tmp);
-            }
-            catch {
-
-            }
-        });
-    }
-
-    delayed(delay_time, cb) {
-        let tmp = new DelayedEffect(this.triggerCtx, delay_time, cb);
-        this.target.effects.push(tmp);
-        return tmp;
-    }
-
-    healOverTimeByMaxHp(value, duration){
-
-    }
-
-    shieldByCasterMaxHp(percent, duration) {
-        return this._make_shield(this.caster.primary_stats.max_hp * percent , duration);
-    }
-
-    shieldByTargetMaxHp(percent, duration) {
-        console.log('ADD SHIEDL..', percent);
-        return this._make_shield(this.target.primary_stats.max_hp * percent , duration);
-    }
-
-    shieldByCasterCurrentHp(percent, duration) {
-        return this._make_shield(this.caster.current_hp * percent , duration);
-    }
-
-    shieldByTargetCurrentHp(percent, duration) {
-        return this._make_shield(this.target.current_hp * percent , duration);
-    }
-
-    _make_shield(value, duration) {
-        return this._add_effect(EffectType.Shield, Math.floor(value), duration);
-    }
-
-    getTotalShield() {
-        let sum = 0;
-        this.target.effects.forEach(effect => {
-            if (effect.type === EffectType.Shield) {
-                console.log('shiled count...', effect.value);
-                sum += effect.value;
-            }
-        });
-        return sum;
-    }
-
-    removeMark() {
-        this.target.removeEffectByType(EffectType.Mark);
-    }
-
-    _add_effect(type, value, duration) {
-        let e = new Effect(this.caster, this.target, type, value, duration);
-        e.add(value);
-        this.target.effects.push(e);
-        return e;
-    }
-
-    run_trigger(when, owner, cause) {
+    _run_trigger(when, owner, cause) {
         cause = cause || cause === this.target ? this.caster : this.target;
         this.arena.__run_trigger(when, owner, cause);
     }
 
-    get ownerCtx() {
-        return new F(this.arena, this.caster, this.caster);
-    }
+    _call_with_new_context(targets) {
+        targets.forEach(target => {
+            try {
+                let tmp = new F(this.arena, this.caster, target);
+                cb(tmp);
+            }
+            catch {
 
-    get triggerCtx() {
-        return new F(this.arena, this.caster, this.target);
-    }
-
-    get ctxCasterCaster() {
-        return new F(this.arena, this.caster, this.caster);
-    }
-
-    get ctxCasterTarget() {
-        return new F(this.arena, this.caster, this.target);
-    }
-
-    // Get Status....
-    get targetIsStunned() {
-        return this.target.status.stun > 0;
-    }
-
-    get targetIsMarked() {
-        return this.target.status.mark > 0;
-    }
-
-    get targetIsTaunted() {
-        return this.target.status.taunt > 0;
-    }
-
-    get targetIsBleeding() {
-        return this.target.effects.filter(e => e.type === EffectType.Bleeding).length > 0;
-    }
-
-    get targetHpRatio() {
-        return this.target.current_hp / this.target.primary_stats.max_hp;
+            }
+        });
     }
 
 }

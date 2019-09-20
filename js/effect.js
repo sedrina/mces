@@ -6,22 +6,28 @@ class Effect {
         this.value = value;
         this.duration = duration;
         this.unremoveable = false;
+        this.persistent = false;
     }
 
     add(value){
         switch (this.type) {
             // Status Effects.....
             case EffectType.Stun:
+                console.log('ADD STUN', value, this.duration);
                 this.target.status.stun += value;
+                this._stop_casting(this.target.status.stun);
                 break;
             case EffectType.Sleep:
                 this.target.status.sleep += value;
+                this._stop_casting(this.target.status.sleep);
                 break;
             case EffectType.Freeze:
                 this.target.status.freeze += value;
+                this._stop_casting(this.target.status.freeze);
                 break;
             case EffectType.Silence:
                 this.target.status.silence += value;
+                this._stop_casting(this.target.status.silence);
                 break;
             case EffectType.Taunt:
                 this.target.status.taunt += value;
@@ -108,16 +114,46 @@ class Effect {
             case EffectType.Immunity2Stun:
                 this.target.modifier.immunity_to_stun += value;
                 break;
-            // Stat changes
-            case EffectType.ModifyArmor:
-            case EffectType.ModifyATK:
-            case EffectType.MaxHp:
-            case EffectType.ModifyAttackSpeed:
-            case EffectType.ModifySkillSpeed:
-                break;
             case EffectType.Shield:
                 // No needs for action
                 break;
+            // Flat Modification
+            case EffectType.FlatATK:
+                this.target.primary_stats.atk += value;
+                break;
+            case EffectType.FlatArmor:
+                this.target.primary_stats.armor += value;
+                break;
+            case EffectType.FlatHP:
+                this._update_hp(value);
+                break;
+            case EffectType.FlatAttackSpeed:
+                break;
+            case EffectType.FlatSkillSpeed:
+                break;
+            // Percent modification
+            case EffectType.PercentATK:
+                this.target.primary_stats.atk += Math.floor(this.target._base_primary_stats.atk * value);
+                break;
+            case EffectType.PercentArmor:
+                this.target.primary_stats.armor += Math.floor(this.target._base_primary_stats.armor * value);
+                break;
+            case EffectType.PercentHP:
+                this._update_hp(Math.floor(this.target._base_primary_stats.max_hp * value));
+                break;
+            case EffectType.PercentAttackSpeed:
+            {
+                value = this.target._base_primary_stats.attack_cd * value / 2;
+                this.target.primary_stats.attack_cd -= value;
+                if ( value > 0 ) {
+                    this.target.action_power += value;
+                }
+            }
+            break;
+            case EffectType.PercentSkillSpeed:
+                this._update_skill_speed(value);
+                break;
+            // Stat changes
         }
     }
 
@@ -140,12 +176,9 @@ class Effect {
         this.unremoveable = true;
     }
 
-    is_buff() {
-        return this.target.team_id === this.caster.team_id;
-    }
-
-    is_debuff() {
-        return this.target.team_id !== this.caster.team_id;
+    makePersistent() {
+        this.unremoveable = true;
+        this.persistent = true;
     }
 
     get isRemoveableBuff() {
@@ -154,6 +187,30 @@ class Effect {
 
     get isRemoveableDebuff() {
         return !this.unremoveable && this.target.team_id !== this.caster.team_id;
+    }
+
+    _stop_casting(value) {
+        if ( value > 0 ) {
+            this.target.stopCasting();
+        }
+    }
+
+    _update_hp(value) {
+        this.target.primary_stats.max_hp += value;
+        if ( value > 0 ) {
+            this.target.current_hp += value;
+        }
+        this.target.current_hp = std_max(this.target.current_hp, this.target.primary_stats.max_hp);
+    }
+
+    _update_skill_speed(percent) {
+        this.target.active_skills.forEach(skill => {
+           let tmp = skill.base_cooldown * percent / 2;
+           skill.cooldown -= tmp;
+           if ( tmp > 0 ) {
+               skill.action_power += tmp;
+           }
+        });
     }
 }
 
@@ -187,6 +244,7 @@ class BleedingEffect extends Effect
     _apply_damage() {
         // TODO what is the apply mechanism???
     }
+
 }
 
 

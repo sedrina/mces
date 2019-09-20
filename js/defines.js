@@ -19,14 +19,8 @@ const Race = {
 };
 Object.freeze(Race);
 
-
-
 const EffectType = {
     'Dummy': 1,
-    'MaxHp': 2,
-    'ModifyATK': 3,
-    'ModifyArmor': 4,
-    'ModifySkillSpeed': 5,
     'HitChance': 6,
     'Dodge': 7,
     'CounterAttack': 8,
@@ -50,7 +44,6 @@ const EffectType = {
     'Immunity2CrestOfDest': 26,
     'Immunity2CrestOfDespair': 27,
     'Immunity2CrestOfChaos': 28,
-    'ModifyAttackSpeed': 29,
     'Stun': 40,
     'Silence': 41,
     'Sleep': 42,
@@ -65,9 +58,13 @@ const EffectType = {
     'FlatATK': 70,
     'FlatHP': 71,
     'FlatArmor': 72,
-    'PercentATK': 73,
-    'PercentHP': 74,
-    'PercentArmor': 75,
+    'FlatAttackSpeed': 73,
+    'FlatSkillSpeed': 74,
+    'PercentATK': 80,
+    'PercentHP': 81,
+    'PercentArmor': 82,
+    'PercentAttackSpeed': 83,
+    'PercentSkillSpeed': 84
 };
 Object.freeze(EffectType);
 

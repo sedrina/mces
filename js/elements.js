@@ -67,36 +67,49 @@ class Status {
 class Skill {
     constructor(name, data) {
         this.name = name;
-        this.cooldown = data.cooldown;
-        this.cd_counter = this.cooldown;
+        this.base_cooldown = data.cooldown;
+        this.current_cooldown = data.cooldown;
         this.target_type = data.target_type;
-        this.cast_time = 0;
         this.apply = data.apply;
+        this.cast_time = data.cast || 0;
+        this.action_power = 0;
     }
 
     // apply(f) {
     //     // it should be override with data.hero.skill.apply
     // }
 
-    is_castable(){
-        return this.cd_counter <= 0;
+    isReady(){
+        return this.action_power >= this.current_cooldown;
+    }
+
+    needsChannel() {
+        return this.cast_time > 0;
+    }
+
+    goCooldown() {
+        this.action_power = 0;
     }
 }
 
-class BasicAttack{
-    constructor() {
-        this.name = 'Basic Attack';
-        this.target_type = TargetType.OneEnemy;
+const BasicSkillData = {
+    basic_block: {
+        cooldown: 0,
+        target_type: TargetType.Self,
+        cast: 0,
+        apply: function (f) {
+            f.blockChance(1, 1);
+        }
+    },
+    basic_attack: {
+        cooldown: 0,
+        target_type: TargetType.OneEnemy,
+        cast: 0,
+        apply: function (f) {
+            f.dealDamage(1);
+        }
     }
-
-    apply(f){
-        f.dealDamage(1);
-    }
-
-    is_castable(){
-        return true;
-    }
-}
+};
 
 class CastingSkill {
     constructor(skill, target) {
@@ -104,112 +117,6 @@ class CastingSkill {
         this.counter = skill.cast_time;
         this.target = target;
     }
-}
-
-
-class Hero {
-    constructor(name, team_id, data){
-        this.team_id = team_id;
-        this.name = name;
-        this.race = data.race;
-        this.active_skills = [];
-        this.passive_skills = [];
-        this.effects = [];
-        this._base_primary_stats = new PrimaryStats(data);
-        this.primary_stats = new PrimaryStats(data);
-        this.modifier = new ModiferStats();
-        this.status = new Status();
-        this.crest = new Crest();
-        this.action_power = this.primary_stats.attack_cd;
-        this.current_hp = this.primary_stats.max_hp;
-        this.casting_skill = null;
-        this._generate_skills(data);
-    }
-
-    wakeUpFromSleep() {
-        this.status.sleep = 0;
-    }
-
-    isReady() {
-        return this.isAlive() &&
-            this.action_power <= 0 &&
-            this.status.stun === 0 &&
-            this.status.sleep === 0 &&
-            this.status.freeze === 0;
-    }
-
-    isTargetableByAlly() {
-        return this.isAlive() && this.status.freeze === 0;
-    }
-
-    isTargetableByEnemy() {
-        return this.isAlive() && this.status.freeze === 0 && this.status.invulnurable === 0;
-    }
-
-    isReadyForCastingSkill() {
-        return this.casting_skill;
-    }
-
-    isAlive() {
-        return this.current_hp > 0;
-    }
-
-    stopCasting() {
-        if ( this.casting_skill ) {
-            this.casting_skill = null;
-        }
-    }
-
-    removeEffectByType(effect_type) {
-        this.effects.forEach(effect => {
-            if (effect.type === effect_type) {
-                effect.remove();
-            }
-        });
-    }
-
-    tick(elapsed){
-        if ( this.current_hp <= 0 ) {
-            return;
-        }
-
-        this.effects.forEach(effect => effect.update(elapsed));
-        this.effects = this.effects.filter(e => e.duration > 0);
-
-        if ( this.status.stun > 0 || this.status.freeze > 0 ) {
-            return;
-        }
-
-        let elapsed_for_skill_time = elapsed / this.modifier.skill_speed;
-
-        if ( this.casting_skill ) {
-            this.casting_skill.counter -= elapsed_for_skill_time;
-            return;
-        }
-
-        let elapsed_for_action_time = elapsed / this.modifier.attack_cd;
-        this.action_power -= elapsed_for_action_time;
-        this.active_skills.forEach(skill => {
-            skill.cd_counter = std_max(skill.cd_counter - elapsed_for_skill_time, 0);
-        });
-    }
-
-    get_avaliable_skills() {
-        if ( this.status.silence > 0 ) {
-            return [];
-        }
-        return this.active_skills.filter(s => s.is_castable() );
-    }
-
-    _generate_skills(data) {
-        for ( let name in data.active_skills) {
-            this.active_skills.push(new Skill(name, data.active_skills[name]));
-        }
-        for ( let name in data.passive_skills) {
-            this.passive_skills.push(new Skill(name, data.passive_skills[name]));
-        }
-    }
-
 }
 
 class Trigger {
@@ -230,6 +137,137 @@ class Trigger {
 
     useCount(value) {
         this._avalible = value;
+    }
+
+}
+
+
+class Hero {
+    constructor(name, team_id, data){
+        this.team_id = team_id;
+        this.name = name;
+        this.race = data.race;
+        this._base_primary_stats = new PrimaryStats(data);
+        this.primary_stats = new PrimaryStats(data);
+        this.modifier = new ModiferStats();
+        this.status = new Status();
+        this.crest = new Crest();
+        this.active_skills = [];
+        this.passive_skills = [];
+
+        for ( let name in data.active_skills) {
+            this.active_skills.push(new Skill(name, data.active_skills[name]));
+        }
+        for ( let name in data.passive_skills) {
+            this.passive_skills.push(new Skill(name, data.passive_skills[name]));
+        }
+
+        this.effects = [];
+        this.action_power = 0;
+        this.current_hp = this.primary_stats.max_hp;
+        this.casting_skill = null;
+    }
+
+    isReady() {
+        return this.current_hp > 0 &&
+            this.action_power >= this.primary_stats.attack_cd &&
+            this.status.stun === 0 &&
+            this.status.sleep === 0 &&
+            this.status.freeze === 0;
+    }
+
+    isAlive() {
+        return this.current_hp > 0;
+    }
+
+    isTargetableByAlly() {
+        return this.isAlive() && this.status.freeze === 0;
+    }
+
+    isTargetableByEnemy() {
+        return this.isTargetableByAlly() && this.status.invulnurable === 0;
+    }
+
+    isReadyForCastingSkill() {
+        return this.casting_skill;
+    }
+
+    wakeUpFromSleep() {
+        this.status.sleep = 0;
+    }
+
+    stopCasting() {
+        if ( this.casting_skill ) {
+            this.casting_skill = null;
+        }
+    }
+
+    removeEffectByType(effect_type) {
+        this.effects.forEach(effect => {
+            if (effect.type === effect_type) {
+                effect.remove();
+            }
+        });
+    }
+
+    startCasting(skill) {
+        if ( this.casting_skill ) {
+            throw 'Already Cast a skill!!!';
+        }
+        this.casting_skill = skill;
+    }
+
+    revive(hp) {
+        this.status.revived++;
+        this.current_hp = std_max(this.primary_stats.max_hp, hp);
+    }
+
+    tick(elapsed){
+        if ( this.current_hp <= 0 ) {
+            return;
+        }
+
+        if ( this.status.stun > 0) {
+            console.log(this.name, ' dante?? is stunned action power', this.primary_stats.attack_cd, this.action_power);
+        }
+
+
+        this.effects.forEach(effect => effect.update(elapsed));
+        this.effects = this.effects.filter(e => e.duration > 0);
+
+        if ( this.status.stun > 0 || this.status.freeze > 0 ) {
+            return;
+        }
+
+        this.active_skills.forEach(skill => {
+            skill.action_power += elapsed;
+        });
+
+        if ( this.casting_skill ) {
+            this.casting_skill.counter += elapsed;
+            return;
+        }
+
+        this.action_power += elapsed;
+    }
+
+    getAvaliableSkills() {
+        if ( this.status.silence > 0 ) {
+            return [];
+        }
+        return this.active_skills.filter(s => s.isReady() );
+    }
+
+    getBasicAttackSkill() {
+        return new Skill('', BasicSkillData.basic_attack);
+    }
+
+    getBasicBlockSkill() {
+        return new Skill('', BasicSkillData.basic_block);
+    }
+
+    resetActionPower() {
+        this.action_power = 0;
     }
 
 }

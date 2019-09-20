@@ -54,9 +54,9 @@ const HEROES = {
             flicker: {
                 apply: function (f) {
                     f.addTrigger(When.BattleStarted, function (t) {
-                        t.ownerCtx.dodgeChance(0.21, 999).makeUnremoveable();
-                        t.ownerCtx.critiacalStrikeChance(0.27, 999).makeUnremoveable();
-                        t.ownerCtx.lifesteal(0.1, 999).makeUnremoveable();
+                        // t.ownerCtx.dodgeChance(0.21, 999).makeUnremoveable();
+                        // t.ownerCtx.critiacalStrikeChance(0.27, 999).makeUnremoveable();
+                        // t.ownerCtx.lifesteal(0.1, 999).makeUnremoveable();
                     });
                     f.addTrigger(When.Dodged, function (t) {
                         t.ownerCtx.critiacalStrikeChance(1, 1);
@@ -70,7 +70,7 @@ const HEROES = {
             ruination: {
                 apply: function (f) {
                     f.addTrigger(When.OnAttacked, function (t) {
-                        t.ownerCtx.modifyDamageDealt(0.2, 6);
+                        t.ownerCtx.damageDealt(0.2, 6);
                     });
                 }
             }
@@ -88,7 +88,7 @@ const HEROES = {
                 target_type: TargetType.OneEnemy,
                 apply: function (f) {
                     f.dealDamage(2);
-                    f.modifyHealingDone(-0.5, 5);
+                    f.healingDone(-0.5, 5);
                     let removed = f.removeBuffs(1);
                     if ( removed ) {
                         f.dealPierceDamage(1);
@@ -100,7 +100,7 @@ const HEROES = {
                 target_type: TargetType.AllEnemies,
                 apply: function (f) {
                     f.dealPierceDamage(0.5);
-                    f.modifyDamageDealt(-0.4, 3);
+                    f.damageDealt(-0.4, 3);
                 }
             }
         },
@@ -109,7 +109,7 @@ const HEROES = {
                 apply: function (f) {
                     f.addTrigger(When.OnAttacked, function (t) {
                         if ( with_certain_chance()) {
-                            t.ownerCtx.addActionPower(0.2);
+                            t.ownerCtx.increaseActionPower(0.2);
                         }
                     });
                 }
@@ -149,8 +149,8 @@ const HEROES = {
                 cooldown: 12,
                 target_type: TargetType.Self,
                 apply: function (f) {
-                    f.modifyDamageDealt(0.3, 5);
-                    f.modifyAttackSpeed(1, 5);
+                    f.damageDealt(0.3, 5);
+                    f.increaseAttackSpeed(1, 5);
                     // Timed jobs...
                     f.removeDebuffs(5);
                 }
@@ -163,8 +163,8 @@ const HEROES = {
                         t.triggerCtx.dealPierceDamage(0.5);
                     }, );
                     f.addTrigger(When.Blocked, t =>  {
-                        t.ownerCtx.forAllAllies(fx =>{
-                            fx.shieldByCasterMaxHp(50, 4);
+                        t.ownerCtx.forAllLiveAllies(fx =>{
+                            fx.shieldFlat(0.5 * fx.casterMaxHP, 4);
                         });
                     }).period(5);
                     f.addTrigger(When.CounterAttacked, t => {
@@ -180,14 +180,67 @@ const HEROES = {
             the_first_apotheon: {
                 apply: function (f) {
                     f.addTrigger(When.Died, t => {
-                        t.ownerCtx.reviveByMaxHp(0.15);
+                        t.ownerCtx.reviveWithFlatHp(0.15 * t.targetMaxHP);
                     }).useCount(1);
                     f.addTrigger(When.Revived, t => {
-                        t.ownerCtx.forAllAllies(fx => {
+                        t.ownerCtx.forAllLiveAllies(fx => {
                            fx.healByMaxHp(0.15);
-                           fx.shieldByCasterMaxHp(0.15, 5);
+                           fx.shieldFlat( 0.15 * fx.casterMaxHP, 5);
                         });
                     }).useCount(1);
+                }
+            }
+        }
+    },
+    chavana: {
+        hp: 26460,
+        atk: 3562,
+        armor: 6337,
+        speed: 2.50,
+        race: Race.Beast,
+        active_skills: {
+            drain_soul: {
+                cooldown: 16,
+                target_type: TargetType.OneEnemy,
+                apply: function (f) {
+                    f.dealLeechDamage(2);
+                    f.ctxCasterCaster.shieldByMaxHP(0.5, 5);
+                }
+            },
+            guardian_of_chavana: {
+                cooldown: 10,
+                target_type: TargetType.Self,
+                apply: function (f) {
+                    f.taunt(5);
+                    f.shieldByCurrentHP(0.5, 5);
+                    f.forAllLiveAllies(g => {
+                        g.removeMark();
+                    });
+                }
+            }
+        },
+        passive_skills: {
+            eye_of_chaos: {
+                apply: function (f) {
+                    f.addTrigger(When.OnStruck, g => {
+                        g.sleep(3);
+                    });
+                    f.addTrigger(When.OnAttacked, g => {
+                        g.dealFlatDamage(0.7 * g.getTotalShield());
+                        g.withCrestOfChaos(count => {
+                            g.silence(1.5 * count);
+                        });
+                    });
+                }
+            },
+            lunar_sprit: {
+                apply: function (f) {
+                    f.addTrigger(When.BattleStarted, g => {
+                        g.forAllLiveAllies(g => {
+                            h.damageReduction(0.1).makeUnremoveable();
+                            h.gainMaxHPFlat(g.targetMaxHP * 0.1).makeUnremoveable();
+                        });
+                    })
                 }
             }
         }

@@ -130,7 +130,10 @@ Turn Max Time: <input id='simulation_time' type="number" pattern='[0-9]{10}' val
         let selected = [];
         for ( let i = 0 ; i < HERO_COUNT ; i++ ) {
             let e = get_hero_selector(team_id, i);
-            selected.push(e.options[e.selectedIndex].value);
+            let name = e.options[e.selectedIndex].value;
+            if ( name !== 'empty' ) {
+                selected.push(e.options[e.selectedIndex].value);
+            }
         }
         return selected;
     }
